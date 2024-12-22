@@ -2,65 +2,73 @@
 import tkinter as tk
 from tkinter import messagebox
 import requests
-
-API_URL = 'http://127.0.0.1:8080'
-
+# -------------------------------
+# GUI APPLICATION
+# -------------------------------
 class BusTrackingApp:
-
     def _init_(self, root):
         self.root = root
-        self.root.title("Bus Tracking App")
+        self.root.title("Bus Tracking System")
+        self.root.geometry("400x500")
 
-        self.bus_list = tk.Listbox(root)
-        self.bus_list.pack(fill=tk.BOTH, expand=True)
+        # ETA
+        tk.Label(root, text="Bus ID:").pack()
+        self.bus_id_entry = tk.Entry(root)
+        self.bus_id_entry.pack()
 
-        self.add_bus_frame = tk.Frame(root)
-        self.add_bus_frame.pack(fill=tk.X)
+        tk.Label(root, text="Stop:").pack()
+        self.stop_entry = tk.Entry(root)
+        self.stop_entry.pack()
 
-        tk.Label(self.add_bus_frame, text="Bus Number:").pack(side=tk.LEFT)
-        self.bus_number_entry = tk.Entry(self.add_bus_frame)
-        self.bus_number_entry.pack(side=tk.LEFT, padx=5)
+        tk.Button(root, text="Get ETA", command=self.get_eta).pack(pady=10)
 
-        tk.Label(self.add_bus_frame, text="Latitude:").pack(side=tk.LEFT)
-        self.latitude_entry = tk.Entry(self.add_bus_frame)
-        self.latitude_entry.pack(side=tk.LEFT, padx=5)
+        # Balance Management
+        tk.Label(root, text="User ID:").pack()
+        self.user_id_entry = tk.Entry(root)
+        self.user_id_entry.pack()
 
-        tk.Label(self.add_bus_frame, text="Longitude:").pack(side=tk.LEFT)
-        self.longitude_entry = tk.Entry(self.add_bus_frame)
-        self.longitude_entry.pack(side=tk.LEFT, padx=5)
+        tk.Label(root, text="Amount:").pack()
+        self.amount_entry = tk.Entry(root)
+        self.amount_entry.pack()
 
-        self.add_bus_button = tk.Button(self.add_bus_frame, text="Add Bus", command=self.add_bus)
-        self.add_bus_button.pack(side=tk.LEFT, padx=5)
+        tk.Button(root, text="Add Balance", command=self.add_balance).pack(pady=10)
+        tk.Button(root, text="Pay Fare", command=self.pay_fare).pack(pady=10)
 
-        self.load_buses()
+    def get_eta(self):
+        bus_id = self.bus_id_entry.get()
+        stop = self.stop_entry.get()
+        try:
+            response = requests.get(f"http://localhost:8080/bus/{bus_id}/eta/{stop}")
+            data = response.json()
+            messagebox.showinfo("ETA", f"ETA: {data['estimated_time']}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch ETA: {e}")
 
-    def load_buses(self):
-        response = requests.get(API_URL)
-        if response.status_code == 200:
-            buses = response.json()
-            self.bus_list.delete(0, tk.END)
-            for bus in buses:
-                self.bus_list.insert(tk.END, f"Bus {bus['number']}: ({bus['latitude']}, {bus['longitude']})")
+    def add_balance(self):
+        user_id = self.user_id_entry.get()
+        amount = self.amount_entry.get()
+        try:
+            response = requests.post(f"http://localhost:8080/user/{user_id}/add_balance", json={'amount': amount})
+            data = response.json()
+            messagebox.showinfo("Success", f"New Balance: {data['current_balance']}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add balance: {e}")
 
-    def add_bus(self):
-        bus_number = self.bus_number_entry.get()
-        latitude = float(self.latitude_entry.get())
-        longitude = float(self.longitude_entry.get())
+    def pay_fare(self):
+        user_id = self.user_id_entry.get()
+        try:
+            response = requests.post(f"http://localhost:8080/user/{user_id}/pay", json={'bus_id': 1})
+            data = response.json()
+            messagebox.showinfo("Success", data['message'])
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to pay fare: {e}")
 
-        bus = {'id': self.get_next_id(), 'number': bus_number, 'latitude': latitude, 'longitude': longitude}
-        response = requests.post(API_URL, json=bus)
-        if response.status_code == 200:
-            self.load_buses()
-        else:
-            messagebox.showerror("Error", "Failed to add bus")
 
-    def get_next_id(self):
-        response = requests.get(API_URL)
-        if response.status_code == 200:
-            buses = response.json()
-            return max(bus['id'] for bus in buses) + 1 if buses else 1
-
-if _name_ == "_main_":
+# -------------------------------
+# RUN THE GUI
+# -------------------------------
+if _name_ == '_main_':
     root = tk.Tk()
     app = BusTrackingApp(root)
     root.mainloop()
+
