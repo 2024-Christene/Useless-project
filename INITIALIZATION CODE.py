@@ -16,4 +16,3 @@ bus_data = {
 
 # Payment data
 payments = []
-print(a)
