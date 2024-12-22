@@ -1,76 +1,155 @@
-# backend.py
-from http.server import BaseHTTPRequestHandler, HTTPServer
+backend.py
+
+import http.server
+import socketserver
 import json
-import os
+from geopy.distance import geodesic
+import random
+import threading
+import socketio
 
-DATA_FILE = 'buses.json'
+# -------------------------------
+# MOCK DATABASE
+# -------------------------------
+buses = {
+    1: {
+        'bus_number': 'Bus101',
+        'current_location': '12.9716,77.5946',
+        'route': 'Station A -> Station B -> Station C',
+        'speed': 40,  # km/h
+        'has_crossed_stop': False,
+        'fee': 1.5
+    }
+}
 
-class BusTrackingHandler(BaseHTTPRequestHandler):
+users = {
+    1: {
+        'name': 'Alice',
+        'balance': 10.0
+    }
+}
 
-    def _set_headers(self):
-        self.send_response(200)
+# -------------------------------
+# SOCKET.IO SERVER (Driver Communication)
+# -------------------------------
+sio = socketio.Server(cors_allowed_origins='*')
+app = socketio.WSGIApp(sio)
+
+
+@sio.event
+def connect(sid, environ):
+    print(f"{sid} connected")
+
+
+@sio.event
+def send_message(sid, data):
+    print(f"Message from {sid}: {data}")
+    sio.emit('receive_message', data)
+
+
+@sio.event
+def disconnect(sid):
+    print(f"{sid} disconnected")
+
+
+# -------------------------------
+# HTTP SERVER (API Endpoints)
+# -------------------------------
+class BusTrackingHandler(http.server.BaseHTTPRequestHandler):
+    def _send_response(self, data, status=200):
+        self.send_response(status)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-
-    def _read_data(self):
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as file:
-                return json.load(file)
-        return []
-
-    def _write_data(self, data):
-        with open(DATA_FILE, 'w') as file:
-            json.dump(data, file)
-
-    def do_GET(self):
-        self._set_headers()
-        data = self._read_data()
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
+    def do_GET(self):
+        path = self.path.split('/')
+        
+        # Get ETA
+        if len(path) >= 4 and path[1] == 'bus' and path[3] == 'eta':
+            bus_id = int(path[2])
+            stop_location = path[4]
+            if bus_id in buses:
+                bus = buses[bus_id]
+                distance = random.uniform(1, 10)  # Mocked distance
+                speed = bus['speed']
+                eta = distance / speed * 60  # minutes
+                self._send_response({
+                    'bus_number': bus['bus_number'],
+                    'estimated_time': f"{eta:.2f} minutes",
+                    'current_location': bus['current_location']
+                })
+            else:
+                self._send_response({'error': 'Bus not found'}, 404)
+
+        # Get Route
+        elif len(path) >= 3 and path[1] == 'bus' and path[3] == 'route':
+            bus_id = int(path[2])
+            if bus_id in buses:
+                self._send_response({
+                    'bus_number': buses[bus_id]['bus_number'],
+                    'route': buses[bus_id]['route']
+                })
+            else:
+                self._send_response({'error': 'Bus not found'}, 404)
+
+        # Get Traffic
+        elif len(path) >= 3 and path[1] == 'traffic':
+            location = path[2]
+            traffic_level = random.choice(['Low', 'Medium', 'High'])
+            self._send_response({
+                'location': location,
+                'traffic': traffic_level
+            })
+
+        else:
+            self._send_response({'error': 'Invalid endpoint'}, 404)
+
     def do_POST(self):
+        path = self.path.split('/')
         content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        bus = json.loads(post_data)
+        body = json.loads(self.rfile.read(content_length).decode('utf-8'))
 
-        data = self._read_data()
-        data.append(bus)
-        self._write_data(data)
+        # Pay Fare
+        if len(path) >= 4 and path[1] == 'user' and path[3] == 'pay':
+            user_id = int(path[2])
+            bus_id = body.get('bus_id')
+            if user_id in users and bus_id in buses:
+                user = users[user_id]
+                bus = buses[bus_id]
+                if user['balance'] >= bus['fee']:
+                    user['balance'] -= bus['fee']
+                    self._send_response({
+                        'message': 'Fare payment successful',
+                        'remaining_balance': user['balance']
+                    })
+                else:
+                    self._send_response({'error': 'Insufficient balance'}, 400)
+            else:
+                self._send_response({'error': 'User or Bus not found'}, 404)
 
-        self._set_headers()
-        self.wfile.write(json.dumps(bus).encode('utf-8'))
 
-    def do_PUT(self):
-        content_length = int(self.headers['Content-Length'])
-        put_data = self.rfile.read(content_length)
-        updated_bus = json.loads(put_data)
+# -------------------------------
+# START SERVERS
+# -------------------------------
+def start_http_server():
+    with socketserver.ThreadingTCPServer(('localhost', 8080), BusTrackingHandler) as httpd:
+        print("HTTP server running on http://localhost:8080")
+        httpd.serve_forever()
 
-        data = self._read_data()
-        for bus in data:
-            if bus['id'] == updated_bus['id']:
-                bus.update(updated_bus)
 
-        self._write_data(data)
-        self._set_headers()
-        self.wfile.write(json.dumps(updated_bus).encode('utf-8'))
+def start_socketio_server():
+    import eventlet
+    import eventlet.wsgi
+    eventlet.wsgi.server(eventlet.listen(('localhost', 5000)), app)
 
-    def do_DELETE(self):
-        content_length = int(self.headers['Content-Length'])
-        delete_data = self.rfile.read(content_length)
-        bus_id = json.loads(delete_data)['id']
-
-        data = self._read_data()
-        data = [bus for bus in data if bus['id'] != bus_id]
-        self._write_data(data)
-
-        self._set_headers()
-        self.wfile.write(json.dumps({'message': 'Bus deleted'}).encode('utf-8'))
-
-def run(server_class=HTTPServer, handler_class=BusTrackingHandler, port=8080):
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    print(f'Starting server on port {port}')
-    httpd.serve_forever()
 
 if _name_ == '_main_':
-    run()
-buses.json=[]
+    http_thread = threading.Thread(target=start_http_server)
+    socketio_thread = threading.Thread(target=start_socketio_server)
+
+    http_thread.start()
+    socketio_thread.start()
+
+    http_thread.join()
+    socketio_thread.join()
