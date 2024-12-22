@@ -1,5 +1,5 @@
 Start 
-Initialization(Setting up environment for frontend and backend process)
+Initialization(Setting up the environment for frontend and backend process)
 Backend Setup
 Add data to JavaScript 
 Define a list of bus schedules
@@ -8,6 +8,4 @@ Create an API endpoint to return the bus schedules in JSON format
 Frontend Setup
 Create an HTML template to display the bus schedule.
 Include JavaScript to fetch the bus schedules from the API and dynamically display them on the page.
-Running the Application
-Access the application through a web browser
 Stop
