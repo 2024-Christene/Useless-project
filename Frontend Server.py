@@ -5,7 +5,7 @@ import requests
 # -------------------------------
 # GUI APPLICATION
 # -------------------------------
-class BusTrackingApp:
+class CampusCruise:
     def _init_(self, root):
         self.root = root
         self.root.title("Bus Tracking System")
@@ -69,6 +69,6 @@ class BusTrackingApp:
 # -------------------------------
 if _name_ == '_main_':
     root = tk.Tk()
-    app = BusTrackingApp(root)
+    app = CampusCruise(root)
     root.mainloop()
 
