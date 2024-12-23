@@ -13,18 +13,18 @@ import socketio
 # -------------------------------
 buses = {
     1: {
-        'bus_number': 'Bus101',
-        'current_location': '12.9716,77.5946',
-        'route': 'Station A -> Station B -> Station C',
+        'bus_number': 'BUS 19',
+        'current_location': '10.100962, 76.356674',
+        'route': 'Aluva -> Pulinchode -> Premier -> Kakkannad -> Hill Palace -> Thiruvankulam -> Chottanikara -> Eruveli -> Palace Square -> TIST ',
         'speed': 40,  # km/h
         'has_crossed_stop': False,
         'fee': 1.5
     }
 }
 
-users = {
+passangers = {
     1: {
-        'name': 'Alice',
+        'name': 'Mahima',
         'balance': 10.0
     }
 }
