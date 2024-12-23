@@ -1,4 +1,4 @@
-# Bus tracking app
+# Campus Cruise
 A simple desktop bus tracking application built with Python and Tkinter.
 
 ## Features:
